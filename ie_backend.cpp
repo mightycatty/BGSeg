@@ -55,19 +55,20 @@ VINOInference::VINOInference(std::string model_dir_name, std::string device, std
 		// --------------------------- 3. initialize IECore && Loading model to specific device ------------------------------------------
 		Core ie;
 		ExecutableNetwork executable_network;
-		auto extension_ptr = make_so_pointer<IExtension>("cpu_extension_avx2.dll");
-		ie.AddExtension(extension_ptr, "CPU");
 		std::vector<std::string> available_devices = ie.GetAvailableDevices();
 		bool GPU_found = (std::find(available_devices.begin(), available_devices.end(), "GPU") != available_devices.end());
 		bool cpu_flag = false;
 		// TODO: device 
-		if (true)
+		if (!GPU_found)
 		{
 			std::map<std::string, std::string> ieConfig = {
 				{InferenceEngine::PluginConfigParams::KEY_CPU_THREADS_NUM, cpu_threads},
 				{InferenceEngine::PluginConfigParams::KEY_CPU_BIND_THREAD, InferenceEngine::PluginConfigParams::YES},
 				{InferenceEngine::PluginConfigParams::KEY_CPU_THROUGHPUT_STREAMS, "1"}
 			};
+
+			auto extension_ptr = make_so_pointer<IExtension>("cpu_extension_avx2.dll");
+			ie.AddExtension(extension_ptr, "CPU");
 			executable_network = ie.LoadNetwork(network, "CPU", ieConfig);
 		}
 		else
@@ -100,7 +101,8 @@ VINOInference::~VINOInference()
 // unneccesary when embeded in IE
 void VINOInference::Preprocessing(const cv::Mat& kInputImg, cv::Mat& output_img, int resize_width)
 {
-	ResizeWithPadding(kInputImg, output_img, resize_width);
+	//ResizeWithPadding(kInputImg, output_img, resize_width);
+	cv::resize(kInputImg, output_img, cv::Size(resize_width, resize_width));
 	return ;
 }
 
@@ -111,25 +113,26 @@ void VINOInference::PostProcessing(const cv::Mat& inputImg, cv::Mat& mask)
 	int or_height = inputImg.size().height;
 	int or_width = inputImg.size().width;
 
-	float ratio = float(std::min(or_height, or_width)) / float(std::max(or_height, or_width));
-	
-	float mask_width = mask.size().width;
-	cv::Rect roi;
-	if (or_width >= or_height)
-	{
-		roi.x = 0;
-		roi.height = mask_width * ratio;
-		roi.y = (mask_width - roi.height) / 2;
-		roi.width = mask_width;
-	}
-	else
-	{
-		roi.y = 0;
-		roi.height = mask_width;
-		roi.width = mask_width * ratio;
-		roi.x = (mask_width - roi.width) / 2;
-	}
-	resize(mask(roi), mask, cv::Size(or_width, or_height));
+	//float ratio = float(std::min(or_height, or_width)) / float(std::max(or_height, or_width));
+	//
+	//float mask_width = mask.size().width;
+	//cv::Rect roi;
+	//if (or_width >= or_height)
+	//{
+	//	roi.x = 0;
+	//	roi.height = mask_width * ratio;
+	//	roi.y = (mask_width - roi.height) / 2;
+	//	roi.width = mask_width;
+	//}
+	//else
+	//{
+	//	roi.y = 0;
+	//	roi.height = mask_width;
+	//	roi.width = mask_width * ratio;
+	//	roi.x = (mask_width - roi.width) / 2;
+	//}
+	//resize(mask(roi), mask, cv::Size(or_width, or_height));
+	resize(mask, mask, cv::Size(or_width, or_height));
 }
 
 

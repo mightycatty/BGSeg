@@ -17,7 +17,7 @@ public:
 	bool segImg(cv::Mat& inputImg, cv::Mat& segResult, const bool staticFlag=false); // 
 
 private:
-	const std::string kModelName = "../model_IR/256_256/fp32/mobilenet_3.5B_with_mean-scale";
+	const std::string kModelName = "../model_IR/256_256/fp16/mobilenet_3.5B_with_mean-scale";
 	VideoSmooth video_smoother_;
 	ROIGenerator roi_generator_;
 	VINOInference ie_;

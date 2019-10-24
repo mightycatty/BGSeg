@@ -16,7 +16,7 @@ public:
 	VideoSmooth();
 	~VideoSmooth();
 	void Reset();
-	void Process(cv::Mat& new_img, cv::Mat& new_mask, cv::Mat& result);
+	void Process(cv::Mat& new_img, cv::Mat& new_mask, cv::Mat& result, bool seq_fusion_flag=true);
 
 
 private:
@@ -25,7 +25,7 @@ private:
 
 
 	cv::Mat prev_mask_;
-	const float kSmoothDegree_ = 0.95;
+	const float kSmoothDegree_ = 0.75;
 	const int kSmoothLen_ = 5;
 	std::vector<cv::Mat> img_seq_buffer_;
 	std::vector<cv::Mat> mask_seq_buffer_;

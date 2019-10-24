@@ -30,16 +30,15 @@ void testWithWebCam()
 
 			auto t0 = std::chrono::high_resolution_clock::now();
 			if (segSdk.segImg(frame, segResult, staticFlag)) {
-				//cv::namedWindow("Cam", cv::WINDOW_NORMAL);
-				//cv::imshow("Cam", frame);
-				////cv::waitKey(0);
-				//cv::namedWindow("Mask", cv::WINDOW_NORMAL);
-				//cv::imshow("Mask", segResult * 255);
-				//cv::waitKey(1);
+				/*cv::namedWindow("Cam", cv::WINDOW_NORMAL);
+				cv::imshow("Cam", frame);
+				cv::namedWindow("Mask", cv::WINDOW_NORMAL);
+				cv::imshow("Mask", segResult * 255);
+				cv::waitKey(1);*/
 			}
 			auto t1 = std::chrono::high_resolution_clock::now();
 			double duration_ms = std::chrono::duration_cast<ms>(t1 - t0).count();
-			std::cout << duration_ms << " milliseconds" << std::endl;
+			//std::cout << duration_ms << " milliseconds" << std::endl;
 
 		}
 	}

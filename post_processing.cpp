@@ -128,10 +128,17 @@ void VideoSmooth::SeqMaskFusion(cv::Mat& new_img, cv::Mat& new_mask, cv::Mat& fu
 }
 
 
-void VideoSmooth::Process(cv::Mat& new_img, cv::Mat& new_mask, cv::Mat& result)
+void VideoSmooth::Process(cv::Mat& new_img, cv::Mat& new_mask, cv::Mat& result, bool seq_fusion_flag)
 {
 	// memory binding
-	SeqMaskFusion(new_img, new_mask, result);
+	if (seq_fusion_flag)
+	{
+		SeqMaskFusion(new_img, new_mask, result);
+	}
+	else
+	{
+		result = new_mask;
+	}
 	//cv::imshow("fusion", result * 255);
 	result.convertTo(result, CV_32FC1); // convertion to fp32 for alpha-smooth later
 	if (!(prev_mask_.empty()))
