@@ -20,15 +20,13 @@ void testWithWebCam()
 	cv::VideoCapture cap(0);
 	if (cap.isOpened())
 	{
-		bool bTemp = true;
+		//bool bTemp = true;
+		//cv::Mat frame = cv::imread("D:/Work/Test/seg_demo_openvino19/samples/bg.png");
 		cv::Mat frame;
 
 		while (1)
 		{
-			if (bTemp) {
-				cap >> frame;
-				bTemp = false;
-			}
+			cap >> frame;
 
 			auto t0 = std::chrono::high_resolution_clock::now();
 			if (segSdk.segImg(frame, segResult, staticFlag)) {
