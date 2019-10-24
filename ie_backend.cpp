@@ -32,7 +32,7 @@ VINOInference::VINOInference(std::string model_dir_name, std::string device, std
 		inputData->setPrecision(Precision::U8);
 		inputData->getPreProcess().setColorFormat(ColorFormat::RGB);
 		inputData->setLayout(Layout::NCHW);
-		//inputData->getPreProcess().setResizeAlgorithm(RESIZE_BILINEAR);
+		inputData->getPreProcess().setResizeAlgorithm(RESIZE_BILINEAR);
 
 
 		// --------------------------- Prepare output blobs ----------------------------------------------------
@@ -42,6 +42,7 @@ VINOInference::VINOInference(std::string model_dir_name, std::string device, std
 		auto outputData = outputInfoItem.second;
 		outputData->setPrecision(Precision::FP32);
 		outputData->setLayout(Layout::NCHW);
+		//outputData->get
 		// --------------------------- resize network ---------------------------------------------------------
 		//auto input_shapes = network.getInputShapes();
 		//std::string input_name;
@@ -187,8 +188,8 @@ void VINOInference::getOutput(cv::Mat& matResult, InferRequest::Ptr& inferReques
 void VINOInference::Predict(const cv::Mat& imageData, cv::Mat& result)
 {
 	//auto start = clock();
-	Preprocessing(imageData, img_prepro_);
-	img_blob_ = wrapMat2Blob(img_prepro_);
+	//Preprocessing(imageData, img_prepro_);
+	img_blob_ = wrapMat2Blob(imageData);
 	//img_prepro_.convertTo(img_prepro_, CV_8UC1);
 
 	infer_request_.SetBlob(input_name_, img_blob_);

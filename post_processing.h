@@ -25,7 +25,7 @@ private:
 
 
 	cv::Mat prev_mask_;
-	const float kSmoothDegree_ = 0.75;
+	const float kSmoothDegree_ = 0.90;
 	const int kSmoothLen_ = 5;
 	std::vector<cv::Mat> img_seq_buffer_;
 	std::vector<cv::Mat> mask_seq_buffer_;
