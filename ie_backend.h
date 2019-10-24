@@ -25,7 +25,10 @@ class VINOInference
 public:
 	VINOInference(std::string model_dir_name, std::string device="AUTO", std::string cpu_threads="1");
 	~VINOInference();
+
 	void Predict(const cv::Mat& orgimg, cv::Mat& result);
+	bool PredictAsync(const cv::Mat& imageData, cv::Mat& result);
+
 	std::string err_msg_;
 	float predict_time_;
 	int input_height_ = 256;
@@ -34,12 +37,15 @@ public:
 private:
 
 	InferRequest infer_request_;
+	InferRequest::Ptr m_async_infer_request_curr;
+	InferRequest::Ptr m_async_infer_request_next;
+
 	std::string input_name_;
 	std::string output_name_;
 	Blob::Ptr img_blob_, output_blob_;
 	cv::Mat img_prepro_;
 	void Preprocessing(const cv::Mat& kInputImg, cv::Mat& output_img, int resize_width=256); //which is not required when embeded in openvinoIE
-	void getOutput(cv::Mat&);
+	void getOutput(cv::Mat&, InferRequest::Ptr& inferRequest);
 	void PostProcessing(const cv::Mat& kInputImg, cv::Mat& mask);
 };
 

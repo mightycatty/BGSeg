@@ -33,6 +33,8 @@ VINOInference::VINOInference(std::string model_dir_name, std::string device, std
 		inputData->getPreProcess().setColorFormat(ColorFormat::RGB);
 		inputData->setLayout(Layout::NCHW);
 		//inputData->getPreProcess().setResizeAlgorithm(RESIZE_BILINEAR);
+
+
 		// --------------------------- Prepare output blobs ----------------------------------------------------
 		OutputsDataMap outputInfo(network.getOutputsInfo());
 		auto outputInfoItem = *outputInfo.begin();
@@ -72,8 +74,15 @@ VINOInference::VINOInference(std::string model_dir_name, std::string device, std
 		{
 			executable_network = ie.LoadNetwork(network, "GPU");
 		}
+
 		// --------------------------- 5. Create infer request -------------------------------------------------
-		infer_request_ = executable_network.CreateInferRequest(); // the end of IE initialization
+		//infer_request_ = executable_network.CreateInferRequest(); // the end of IE initialization
+
+		m_async_infer_request_curr = executable_network.CreateInferRequestPtr();
+		m_async_infer_request_next = executable_network.CreateInferRequestPtr();
+
+		/* it's enough just to set image info input (if used in the model) only once */
+
 	//}
 	//catch (InferenceEngineException e) {
 	//	//spdlog::error("error with OPENVINO_IE initialization");
@@ -124,9 +133,10 @@ void VINOInference::PostProcessing(const cv::Mat& inputImg, cv::Mat& mask)
 }
 
 
-void VINOInference::getOutput(cv::Mat& matResult)
+void VINOInference::getOutput(cv::Mat& matResult, InferRequest::Ptr& inferRequest)
 {
-	output_blob_ = infer_request_.GetBlob(output_name_);
+	//output_blob_ = infer_request_.GetBlob(output_name_);
+	output_blob_ = inferRequest->GetBlob(output_name_);
 	auto output_data = output_blob_->buffer().as<float*>();
 
 	size_t C, H, W;
@@ -135,31 +145,38 @@ void VINOInference::getOutput(cv::Mat& matResult)
 	W = input_width;
 	size_t image_stride = W * H * C;
 	///** Iterating over each pixel **/
-	std::vector<std::vector<float>> outArrayClasses(H, std::vector<float>(W, 0));
-	std::vector<std::vector<float>> outArrayProb(H, std::vector<float>(W, 0.));
+	matResult = cv::Mat(cv::Size(W, H), CV_8UC1);
 	for (size_t w = 0; w < W; ++w) {
 		for (size_t h = 0; h < H; ++h) {
 			/* number of channels = 1 means that the output is already ArgMax'ed */
-			if (C == 1) {
-				outArrayClasses[h][w] = static_cast<float>(output_data[W * h + w]);
-			}
-			else {
+			//if (C == 1) {
+			//	outArrayClasses[h][w] = static_cast<float>(output_data[W * h + w]);
+			//}
+			//else {
 				/** Iterating over each class probability **/
-				for (int ch = 0; ch < C; ++ch) {
-					auto data = output_data[W * H * ch + W * h + w];
-					if (data > outArrayProb[h][w]) {
-						outArrayClasses[h][w] = static_cast<float>(ch);
-						outArrayProb[h][w] = data;
-					}
+				//for (int ch = 0; ch < C; ++ch) {
+				//	auto data = output_data[W * H * ch + W * h + w];
+				//	if (data > outArrayProb[h][w]) {
+				//		outArrayClasses[h][w] = static_cast<float>(ch);
+				//		outArrayProb[h][w] = data;
+				//	}
+				//}
+				if (output_data[W * h + w] > output_data[W * H * 1 + W * h + w])
+				{
+					matResult.at<uchar>(h, w) = 0;
 				}
-			}
+				else
+				{
+					matResult.at<uchar>(h, w) = 1;
+				}
+			//}
 		}
 	}
-	matResult = cv::Mat(outArrayClasses.size(), outArrayClasses.at(0).size(), CV_64FC1);
-	for (int i = 0; i < matResult.rows; ++i)
-		for (int j = 0; j < matResult.cols; ++j)
-			matResult.at<double>(i, j) = outArrayClasses.at(i).at(j);
-	matResult.convertTo(matResult, CV_8U); 
+	
+	//for (int i = 0; i < matResult.rows; ++i)
+	//	for (int j = 0; j < matResult.cols; ++j)
+	//		matResult.at<double>(i, j) = outArrayClasses.at(i).at(j);
+	//matResult.convertTo(matResult, CV_8U); 
 	return ;
 }
 
@@ -170,12 +187,40 @@ void VINOInference::Predict(const cv::Mat& imageData, cv::Mat& result)
 	Preprocessing(imageData, img_prepro_);
 	img_blob_ = wrapMat2Blob(img_prepro_);
 	//img_prepro_.convertTo(img_prepro_, CV_8UC1);
+
 	infer_request_.SetBlob(input_name_, img_blob_);
 	infer_request_.Infer();
+
 	//predict_time = clock() - start;
 	//spdlog::info("Inference time:{:2.4f}", duration);
-	getOutput(result);
+	getOutput(result, m_async_infer_request_curr);
 	PostProcessing(imageData, result); // restore to original image size
 	return ;
 }
 
+bool VINOInference::PredictAsync(const cv::Mat& imageData, cv::Mat& result)
+{
+	static bool bFirst = true;
+	static cv::Mat curr_frame;  
+	if (bFirst) {
+		bFirst = false;
+		curr_frame = imageData;
+		return false;
+	}
+
+	Preprocessing(curr_frame, img_prepro_);
+	img_blob_ = wrapMat2Blob(img_prepro_);
+
+	m_async_infer_request_curr->SetBlob(input_name_, img_blob_);
+	m_async_infer_request_curr->StartAsync();
+
+	if (OK == m_async_infer_request_curr->Wait(IInferRequest::WaitMode::RESULT_READY)) {
+		getOutput(result, m_async_infer_request_curr);
+		PostProcessing(curr_frame, result); // restore to original image size
+	}
+
+	curr_frame = imageData;
+	m_async_infer_request_curr.swap(m_async_infer_request_next);
+
+	return true;
+}

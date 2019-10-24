@@ -10,18 +10,15 @@ SegSdk::~SegSdk()
 	//
 }
 
-void SegSdk::segImg(const cv::Mat& inputImg, cv::Mat& segResult, bool staticFlag)
+bool SegSdk::segImg(const cv::Mat& inputImg, cv::Mat& segResult, bool staticFlag)
 {
 	inputImg.copyTo(img_buffer_);
-	cv::imshow("original", img_buffer_);
 	roi_generator_.getROIImage(img_buffer_, img_buffer_roi_);
-	cv::imshow("roi", img_buffer_roi_);
-	ie_.Predict(img_buffer_roi_, segResult);
-	cv::imshow("raw_cnn", segResult * 255);
+	if (!ie_.PredictAsync(img_buffer_roi_, segResult)) {
+		return false;
+	}
 	ContourRefine(segResult);
-	cv::imshow("cnt", segResult * 255);
 	roi_generator_.restoreFromROI(segResult, segResult);
-	cv::imshow("before_smooth", segResult * 255);
 	// size norm for processing downstream
 	if (!staticFlag)
 	{
@@ -36,5 +33,4 @@ void SegSdk::segImg(const cv::Mat& inputImg, cv::Mat& segResult, bool staticFlag
 	{
 		video_smoother_.Reset();
 	}
-	cv::imshow("aftersmooth", segResult * 255);
 }
