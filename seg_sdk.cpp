@@ -1,8 +1,9 @@
 #include "seg_sdk.h"
 
 SegSdk::SegSdk(std::string device, std::string cpu_threads)
-	: ie_(kModelName, device, cpu_threads)
+	: ie_(device, cpu_threads)
 {
+	cv::setNumThreads(1);
 }
 
 SegSdk::~SegSdk()
@@ -10,35 +11,18 @@ SegSdk::~SegSdk()
 	//
 }
 
-bool SegSdk::segImg(cv::Mat& inputImg, cv::Mat& segResult, bool staticFlag)
+bool SegSdk::segImg(cv::Mat& inputImg, cv::Mat& segResult)
 {
-	//int orWidth = inputImg.size().width;
-	//int orHeight = inputImg.size().height;
-	//cv::imshow("raw", inputImg);
-	roi_generator_.getROIImage(inputImg, img_buffer_roi_);
-	//cv::imshow("roi", img_buffer_roi_);
-	if (!ie_.PredictAsync(img_buffer_roi_, segResult)) {
-		return false;
-	}
-	//cv::imshow("cnn_raw", segResult);
-	ContourRefine(segResult);
-	//cv::imshow("after_cnt", segResult);
-	roi_generator_.restoreFromROI(segResult, segResult);
-	// size norm for processing downstream
-	if (!staticFlag)
-	{
-		if (segResult.size() != inputImg.size()) {
-			cv::resize(segResult, segResult, inputImg.size());
-		}
-		//SizeNorm(inputImg, 320);
-		//SizeNorm(segResult, 320);
-		video_smoother_.Process(inputImg, segResult, segResult, false);
-		//cv::resize(segResult, segResult, cv::Size(orWidth, orHeight));
-	}
-	else
-	{
-		video_smoother_.Reset();
-	}
-	//cv::imshow("final", segResult);
-	//cv::waitKey(1);
+	roi_generator_.getROIImage(inputImg, img_roi_);
+	//cv::imshow("roi", img_roi_);
+	if (!ie_.Predict(img_roi_, roi_seg_result_, false)) {return false;}
+	//cv::imshow("raw", roi_seg_result_);
+	post_processor_.ContourRefine(roi_seg_result_);
+	ie_.RestoreShape(img_roi_, roi_seg_result_);
+   	roi_generator_.restoreFromROI(roi_seg_result_, segResult);
+
+	post_processor_.Process(inputImg, segResult, segResult, false);
+
+	roi_generator_.Update(post_processor_.largest_cnt_, img_roi_, ie_.input_width_);
+	return true;
 }

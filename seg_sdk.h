@@ -14,13 +14,12 @@ class SegSdk
 public:
 	SegSdk(std::string device="CPU", std::string cpu_threads="1");
 	~SegSdk();
-	bool segImg(cv::Mat& inputImg, cv::Mat& segResult, const bool staticFlag=false); // 
+	bool segImg(cv::Mat& inputImg, cv::Mat& segResult); // 
 
 private:
-	const std::string kModelName = "../model_IR/600M_512_fp16/600M";
-	VideoSmooth video_smoother_;
+	VideoPost post_processor_;
 	ROIGenerator roi_generator_;
 	VINOInference ie_;
-	cv::Mat img_buffer_roi_;
+	cv::Mat img_roi_, roi_seg_result_;
 };
 #endif
