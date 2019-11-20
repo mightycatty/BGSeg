@@ -12,7 +12,7 @@
 class SegSdk
 {
 public:
-	SegSdk(std::string device="CPU", std::string cpu_threads="1");
+	SegSdk(std::string device="AUTO", std::string cpu_threads="1");
 	~SegSdk();
 	bool segImg(cv::Mat& inputImg, cv::Mat& segResult); // 
 

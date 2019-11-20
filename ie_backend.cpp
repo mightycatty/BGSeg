@@ -21,8 +21,8 @@ VINOInference::VINOInference(std::string device, std::string cpu_threads)
 	std::string model_dir_name;
 	if (gpu_mode)
 	{
-		model_dir_name = kModelMiddle;
-		input_width_ = 256;
+		model_dir_name = kModelSmall;
+		input_width_ = 320;
 	}
 	else
 	{
@@ -71,14 +71,14 @@ VINOInference::VINOInference(std::string device, std::string cpu_threads)
 	else
 	{
 		std::map<std::string, std::string> ieConfig = {
-			{InferenceEngine::PluginConfigParams::KEY_SINGLE_THREAD, InferenceEngine::PluginConfigParams::YES},
+			//{InferenceEngine::PluginConfigParams::KEY_SINGLE_THREAD, InferenceEngine::PluginConfigParams::YES},
 			{InferenceEngine::PluginConfigParams::KEY_GPU_THROUGHPUT_STREAMS, "1"},
 			{InferenceEngine::CLDNNConfigParams::KEY_CLDNN_PLUGIN_THROTTLE, "1"},
-			{InferenceEngine::PluginConfigParams::KEY_CPU_THROUGHPUT_STREAMS, "1"},
-			{InferenceEngine::PluginConfigParams::KEY_CPU_THREADS_NUM, "1"},
+			//{InferenceEngine::PluginConfigParams::KEY_CPU_THROUGHPUT_STREAMS, "1"},
+			//{InferenceEngine::PluginConfigParams::KEY_CPU_THREADS_NUM, "1"},
 
 		};
-		executable_network = ie.LoadNetwork(network, "GPU");
+		executable_network = ie.LoadNetwork(network, "GPU", ieConfig);
 	}
 
 	// --------------------------- 5. Create infer request -------------------------------------------------

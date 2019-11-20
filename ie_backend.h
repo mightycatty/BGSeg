@@ -33,8 +33,8 @@ public:
 
 	std::string err_msg_;
 	float predict_time_;
-	const std::string kModelSmall = "../model_IR/600M/320_fp16/scale_600M";//"../model_IR/256_256/fp16/mobilenet_3.5B_with_mean-scale";
-	const std::string kModelMiddle = "../model_IR/3B/256_256/fp16/mobilenet_3.5B_with_mean-scale";
+	const std::string kModelSmall = "../model_IR/600M/new/600m_320";//"../model_IR/256_256/fp16/mobilenet_3.5B_with_mean-scale";
+	const std::string kModelMiddle = "../model_IR/3B/512/3B-512";
 
 	int input_width_ = 320;
 

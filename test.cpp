@@ -40,13 +40,13 @@ static void game_blending(cv::Mat& fg, cv::Mat& bg, cv::Mat& alpha)
 typedef std::chrono::duration<double, std::ratio<1, 1000>> ms;
 void testWithWebCam()
 {
-	SegSdk segSdk("CPU");
+	SegSdk segSdk("AUTO");
 	cv::Mat segResult;
 	bool staticFlag = false;
 	// resource initialization
 	cv::VideoCapture cap(0);
 	cap.set(cv::CAP_PROP_FPS, 30);
-	//cv::VideoCapture cap_bg("../samples/bg.mp4");
+	cv::VideoCapture cap_bg("../samples/bg.mp4");
 	if (cap.isOpened())
 	{
 		//bool bTemp = true;
@@ -55,10 +55,10 @@ void testWithWebCam()
 		{
 			cap >> frame;
 		}
-		cap.release();
+		//cap.release();
 		while (1)
 		{
-			/*cap >> frame;
+			cap >> frame;
 			try
 			{
 				cap_bg >> bg;
@@ -68,7 +68,7 @@ void testWithWebCam()
 			{
 				cv::VideoCapture cap_bg("../samples/bg.mp4");
 				cap_bg >> bg;
-			}*/
+			}
 			auto t0 = std::chrono::high_resolution_clock::now();
 			if (segSdk.segImg(frame, segResult)) {
 				
@@ -81,10 +81,10 @@ void testWithWebCam()
 				cv::imshow("Mask", mask_vis);
 				cv::waitKey(1);*/
 				// ================ blending ==========================
-				/*game_blending(frame, bg, segResult);
+				game_blending(frame, bg, segResult);
 				cv::namedWindow("blending", cv::WINDOW_NORMAL);
 				cv::imshow("blending", bg);
-				cv::waitKey(1);*/
+				cv::waitKey(1);
 			}
 			auto t1 = std::chrono::high_resolution_clock::now();
 			double duration_ms = std::chrono::duration_cast<ms>(t1 - t0).count();
