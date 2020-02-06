@@ -26,13 +26,12 @@
 ```c++
 // seg sdk initialization
 int model_index = 0; 
-int force_on_cpu = false; 
+bool force_on_cpu = false; 
 std::string cpu_threads_num = "1";
 SegSdk segSdk(model_index, force_on_cpu, cpu_threads_num);
 // prepare your input img, recomand resolution of (480, 320) and of RGB format
-cv::Mat input_img = NONE;
+cv::Mat input_img, seg_result;
 std::string cvt_format = "RGB"; // "BGR"
-cv::Mat seg_result;
 // inference
 segSdk.segImg(input_img, seg_result, cvt_format)
 ```
