@@ -1,5 +1,11 @@
-# Peoplese Segmentation PC SDK
-基于Openvino 推理后端的人像分割PC sdk。根据不同业务对性能与精度的要求，以及GPU的有无，采取栈式的处理策略：当检测到GPU且force_on_cpu=false时默认使用mode-2，无GPU时依照传入的mode_index进行sdk初始化。
+# Streaming Peoplese Segmentation PC SDK
+针对直播间场景的视频流下的人像分割，采用openvino作为推理后端。所谓“针对直播间场景”，有以下特点：
+1. 针对直播间的数据分布，如对坐姿半身的效果最佳，舞姿兼容但是效果一般。
+2. 后处理算法中利用了摄像头固定的先验，此设置下效果最好。但是也做了移动摄像头的兼容（边缘会出现抖动等情况）。
+
+根据不同业务对性能与精度的要求，以及GPU的有无，采取栈式的处理策略：
+1. 当检测到GPU且force_on_cpu=false时默认使用mode-2
+2. 无GPU时依照传入的mode_index进行sdk初始化。
 
 ---
 
