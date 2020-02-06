@@ -12,5 +12,4 @@
 
 std::vector<cv::String> getImageDirInFolder(cv::String pattern);
 bool ContoursSortFun(std::vector<cv::Point> contour1, std::vector<cv::Point> contour2);
-void ResizeWithPadding(const cv::Mat& img, cv::Mat& result, int target_width);
-
+std::vector<cv::String> getModelInFolder(const cv::String model_folder);

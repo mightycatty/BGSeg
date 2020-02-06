@@ -24,19 +24,18 @@ using namespace InferenceEngine;
 class VINOInference
 {
 public:
-	VINOInference(std::string device="AUTO", std::string cpu_threads="1");
+	VINOInference(int model_index=1, std::string cpu_threads="1", bool force_cpu_mode=FALSE);
 	~VINOInference();
 
-	bool Predict(const cv::Mat& orgimg, cv::Mat& result, bool restore_shape);
+	bool Predict(const cv::Mat& orgimg, cv::Mat& result);
 	//bool PredictAsync(const cv::Mat& imageData, cv::Mat& result, bool restore_shape = false);
-	void RestoreShape(const cv::Mat& kInputImg, cv::Mat& mask);
 
 	std::string err_msg_;
 	float predict_time_;
-	const std::string kModelSmall = "../model_IR/600M/new/600m_320";//"../model_IR/256_256/fp16/mobilenet_3.5B_with_mean-scale";
-	const std::string kModelMiddle = "../model_IR/3B/512/3B-512";
+	int input_shape_;
 
-	int input_width_ = 320;
+	std::string kModelDir_ = "../models";
+
 
 private:
 
@@ -47,10 +46,8 @@ private:
 	std::string input_name_;
 	std::string output_name_;
 	Blob::Ptr img_blob_, output_blob_;
-	cv::Mat img_prepro_;
 
-	void Preprocessing(const cv::Mat& kInputImg, cv::Mat& output_img, int resize_width=256); //which is not required when embeded in openvinoIE
-	void getOutput(cv::Mat&, InferRequest& inferRequest);
+	void getOutput(cv::Mat&, InferRequest& inferRequest); // rewrite this for your own network
 	InferenceEngine::Blob::Ptr wrapMat2Blob(const cv::Mat& mat);
 
 };

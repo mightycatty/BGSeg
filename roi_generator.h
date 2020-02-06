@@ -16,7 +16,8 @@ public:
 
 	void getROIImage(cv::Mat& img_src, cv::Mat& img_roi);
 	void restoreFromROI(cv::Mat& mask_src, cv::Mat& mask_restored);
-	void Update(const std::vector<cv::Point>& largest_cnt);
+	void Update(const std::vector<float>& relative_rect);
+	void Update(cv::Mat& mask_result);
 	void Reset(); // reset roi-generator to initial state
 
 
@@ -25,8 +26,10 @@ private:
 	cv::Rect getBoundingRectFromMask(const cv::Mat& binaryMask);
 
 	cv::Rect ROI_rect_;
-	int kUpdatePixelsMargine_ = 8;
-	const float kRoiLeastSizeFraction_ = 0.2;
+	
+	float kUpdatePixelsMargineFraction_ = 0.03;
+	float kUpdateFactor_ = 0.1;
+
 	std::vector<size_t> or_shape_; // (width, height) 
 	bool first_frame_flag_ = true; // set to false after the first call of Update()
 	void ROICheck();

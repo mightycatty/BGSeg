@@ -3,12 +3,11 @@
 using namespace std;
 typedef std::chrono::duration<double, std::ratio<1, 1000>> ms;
 
-static float SimpleSmooth(const float x_t, const float s_t_0, const int margine)
+static float SimpleSmooth(const float x_t, const float s_t_0, const int margine, float alpha)
 {
-	float alpha = 0.05;
 	if (abs(x_t - s_t_0) >= margine)
 	{
-		alpha = 0.1;
+		alpha = 0.5;
 	}
 	float s_t = alpha * x_t + (1 - alpha) * s_t_0;
 	return s_t;
@@ -33,7 +32,7 @@ cv::Rect ROIGenerator::getBoundingRectFromMask(const cv::Mat& alpha_mask)
 	std::vector<std::vector<cv::Point> > contours;
 	cv::Rect ROIRect;
 	cv::Mat binary_mask;
-	cv::threshold(alpha_mask, binary_mask, 0.1, 1, cv::THRESH_BINARY);
+	cv::threshold(alpha_mask, binary_mask, 0.5, 1, cv::THRESH_BINARY);
 	binary_mask.convertTo(binary_mask, CV_8UC1);
 	findContours(binary_mask, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
 	if (contours.size() > 0)
@@ -51,10 +50,13 @@ cv::Rect ROIGenerator::getBoundingRectFromMask(const cv::Mat& alpha_mask)
 
 void ROIGenerator::ROISmooth(cv::Rect rectCurrent)
 {
-	int x_0 = SimpleSmooth(rectCurrent.x, ROI_rect_.x, kUpdatePixelsMargine_);
-	int y_0 = SimpleSmooth(rectCurrent.y, ROI_rect_.y, kUpdatePixelsMargine_);
-	int x_1 = SimpleSmooth((rectCurrent.x + rectCurrent.width), (ROI_rect_.x + ROI_rect_.width), kUpdatePixelsMargine_);
-	int y_1 = SimpleSmooth((rectCurrent.y + rectCurrent.height), (ROI_rect_.y + ROI_rect_.height), kUpdatePixelsMargine_);
+	static int update_pixel_witdh, update_pixel_height;
+	update_pixel_witdh = int(or_shape_[0] * kUpdatePixelsMargineFraction_);
+	update_pixel_height = int(or_shape_[1] * kUpdatePixelsMargineFraction_);
+	int x_0 = SimpleSmooth(rectCurrent.x, ROI_rect_.x, update_pixel_witdh, kUpdateFactor_);
+	int y_0 = SimpleSmooth(rectCurrent.y, ROI_rect_.y, update_pixel_height, kUpdateFactor_);
+	int x_1 = SimpleSmooth((rectCurrent.x + rectCurrent.width), (ROI_rect_.x + ROI_rect_.width), update_pixel_witdh, kUpdateFactor_);
+	int y_1 = SimpleSmooth((rectCurrent.y + rectCurrent.height), (ROI_rect_.y + ROI_rect_.height), update_pixel_height, kUpdateFactor_);
 	ROI_rect_.x = x_0;
 	ROI_rect_.y = y_0;
 	ROI_rect_.width = x_1 - x_0;
@@ -82,8 +84,7 @@ void ROIGenerator::getROIImage(cv::Mat& src, cv::Mat& dst)
 		/*assert(!ROI_rect_.empty());
 		assert(src.size().height == or_shape_[1]);
 		assert(src.size().width == or_shape_[0]);*/
-		cv::Mat roi_img = src(ROI_rect_);
-		roi_img.copyTo(dst);
+		src(ROI_rect_).copyTo(dst);
 	}
 	return;
 }
@@ -123,17 +124,21 @@ void ROIGenerator::ROICheck()
 	int rect_x_1 = ROI_rect_.width + rect_x;
 	int rect_y_1 = ROI_rect_.height + rect_y;
 	// expand roi
-	rect_x = max(int(0), (int)rect_x - kUpdatePixelsMargine_);
-	rect_y = max(int(0), (int)rect_y - kUpdatePixelsMargine_);
-	rect_x_1 = min(int(or_shape_[0]), rect_x_1 + kUpdatePixelsMargine_);
-	rect_y_1 = min(int(or_shape_[1]), rect_y_1 + kUpdatePixelsMargine_);
+	static int update_pixel_witdh, update_pixel_height;
+	update_pixel_witdh = int(or_shape_[0] * kUpdatePixelsMargineFraction_);
+	update_pixel_height = int(or_shape_[1] * kUpdatePixelsMargineFraction_);
+	rect_x = max(int(0), (int)rect_x - update_pixel_witdh);
+	rect_y = max(int(0), (int)rect_y -update_pixel_height);
+	rect_x_1 = min(int(or_shape_[0]), rect_x_1 + update_pixel_witdh);
+	rect_y_1 = min(int(or_shape_[1]), rect_y_1 + update_pixel_height);
 	// reject small roi
-	if ((rect_x_1 - rect_x) < (kRoiLeastSizeFraction_ * or_shape_[0]))
+	static float pixel_fraction_threshold = 0.2;
+	if ((rect_x_1 - rect_x) < (pixel_fraction_threshold * or_shape_[0]))
 	{
 		rect_x = 0;
 		rect_x_1 = or_shape_[0];
 	}
-	if ((rect_y_1 - rect_y) < (kRoiLeastSizeFraction_ * or_shape_[1]))
+	if ((rect_y_1 - rect_y) < (pixel_fraction_threshold * or_shape_[1]))
 	{
 		rect_y = 0;
 		rect_y_1 = or_shape_[1];
@@ -141,17 +146,30 @@ void ROIGenerator::ROICheck()
 	ROI_rect_ = cv::Rect(rect_x, rect_y, (rect_x_1 - rect_x), (rect_y_1 - rect_y));
 }
 
-void ROIGenerator::Update(const std::vector<cv::Point>& largest_cnt)
+void ROIGenerator::Update(const std::vector<float>& relative_rect)
 {
 	static cv::Rect rect_current;
-	if (largest_cnt.size() >= 1)
+	rect_current.x = int(relative_rect[0] * or_shape_[0]);
+	rect_current.width = int(relative_rect[2] * or_shape_[0]);
+	rect_current.y = int(relative_rect[1] * or_shape_[1]);
+	rect_current.height = int(relative_rect[3] * or_shape_[1]);
+
+	if (first_frame_flag_)
 	{
-		rect_current = boundingRect(largest_cnt);
+		first_frame_flag_ = false;
+		ROI_rect_ = rect_current;
 	}
 	else
 	{
-		rect_current = cv::Rect(0, 0, or_shape_[0], or_shape_[1]);
+		ROISmooth(rect_current);
 	}
+	ROICheck();
+}
+
+void ROIGenerator::Update(cv::Mat& mask_result)
+{
+	static cv::Rect rect_current;
+	rect_current = getBoundingRectFromMask(mask_result);
 	if (first_frame_flag_)
 	{
 		first_frame_flag_ = false;
