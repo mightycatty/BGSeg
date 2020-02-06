@@ -1,4 +1,4 @@
-# Streaming Peoplese Segmentation PC SDK
+# Streaming People Segmentation PC SDK
 **针对直播间场景的视频流下的人像分割，采用openvino作为推理后端。**
 
 所谓“针对直播间场景”，有以下特点：
