@@ -1,8 +1,14 @@
 #include "seg_sdk.h"
 
-SegSdk::SegSdk(std::string device, std::string cpu_threads)
-	: ie_(kModelName, device, cpu_threads)
+SegSdk::SegSdk(int model_index, bool force_cpu_mode, std::string cpu_threads)
+	: ie_(model_index, cpu_threads, force_cpu_mode)
 {
+	// force compact mode if model index is 0 and none gpu is detected
+	if ((model_index == 0) && force_cpu_mode)
+	{
+		compact_mode_ = true;
+	}
+	cv::setNumThreads(0);
 }
 
 SegSdk::~SegSdk()
@@ -10,31 +16,48 @@ SegSdk::~SegSdk()
 	//
 }
 
-void SegSdk::segImg(const cv::Mat& inputImg, cv::Mat& segResult, bool staticFlag)
+// unneccesary when embeded in OpenvinoIE
+void preprocessing(cv::Mat& kInputImg, int resize_width, std::string cvt_color)
 {
-	inputImg.copyTo(img_buffer_);
-	cv::imshow("original", img_buffer_);
-	roi_generator_.getROIImage(img_buffer_, img_buffer_roi_);
-	cv::imshow("roi", img_buffer_roi_);
-	ie_.Predict(img_buffer_roi_, segResult);
-	cv::imshow("raw_cnn", segResult * 255);
-	ContourRefine(segResult);
-	cv::imshow("cnt", segResult * 255);
-	roi_generator_.restoreFromROI(segResult, segResult);
-	cv::imshow("before_smooth", segResult * 255);
-	// size norm for processing downstream
-	if (!staticFlag)
+	//ResizeWithPadding(kInputImg, output_img, resize_width);
+	if (cvt_color != "RGB")
 	{
-		int orHeight = inputImg.size().height;
-		int orWidth = inputImg.size().width;
-		SizeNorm(img_buffer_, 320);
-		SizeNorm(segResult, 320);
-		video_smoother_.Process(img_buffer_, segResult, segResult);
-		cv::resize(segResult, segResult, cv::Size(orWidth, orHeight));
+		cv::cvtColor(kInputImg, kInputImg, cv::COLOR_BGR2RGB);
 	}
-	else
+	if ((kInputImg.size().width != resize_width) || (kInputImg.size().height != resize_width))
 	{
-		video_smoother_.Reset();
+		cv::resize(kInputImg, kInputImg, cv::Size(resize_width, resize_width));
 	}
-	cv::imshow("aftersmooth", segResult * 255);
+	return;
 }
+
+
+// trim padding and restore to the original shape
+void restoreShape(cv::Size or_shape, cv::Mat& mask)
+{
+	int or_height = or_shape.height;
+	int or_width = or_shape.width;
+	resize(mask, mask, cv::Size(or_width, or_height));
+}
+
+
+bool SegSdk::segImg(cv::Mat& inputImg, cv::Mat& segResult, std::string cvt_color)
+{
+	static cv::Mat img_roi, roi_seg_result;
+	static cv::Size img_roi_or_size;
+	// ============================================== preprocessing =================================
+	roi_generator_.getROIImage(inputImg, img_roi);
+	img_roi_or_size = img_roi.size();
+	preprocessing(img_roi, ie_.input_shape_, cvt_color);
+	// ============================================= model inference ================================
+	if (!ie_.Predict(img_roi, roi_seg_result)) { return false; }
+	// ============================================== postprocessing =================================
+	cv::threshold(roi_seg_result, roi_seg_result, 0.5, 1, cv::THRESH_BINARY);
+	restoreShape(img_roi_or_size, roi_seg_result);
+	roi_generator_.restoreFromROI(roi_seg_result, segResult);
+	post_processor_.Process(inputImg, segResult, segResult, compact_mode_); //TODO: BUGS when nothing detected
+	roi_generator_.Update(post_processor_.relative_rect_);
+	return true;
+}
+
+

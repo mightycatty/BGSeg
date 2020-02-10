@@ -5,6 +5,7 @@
 #include <vector>
 #include <queue>
 #include <ie_plugin_config.hpp>
+#include <cldnn/cldnn_config.hpp>
 #include <ie_plugin_ptr.hpp>
 #include <cpp/ie_cnn_net_reader.h>
 #include <inference_engine.hpp>
@@ -23,24 +24,32 @@ using namespace InferenceEngine;
 class VINOInference
 {
 public:
-	VINOInference(std::string model_dir_name, std::string device="AUTO", std::string cpu_threads="1");
+	VINOInference(int model_index=1, std::string cpu_threads="1", bool force_cpu_mode=FALSE);
 	~VINOInference();
-	void Predict(const cv::Mat& orgimg, cv::Mat& result);
+
+	bool Predict(const cv::Mat& orgimg, cv::Mat& result);
+	//bool PredictAsync(const cv::Mat& imageData, cv::Mat& result, bool restore_shape = false);
+
 	std::string err_msg_;
 	float predict_time_;
-	int input_height_ = 256;
-	int input_width = 256;
+	int input_shape_;
+
+	std::string kModelDir_ = "../models";
+
 
 private:
 
+	//InferRequest::Ptr m_async_infer_request_curr_;
+	//InferRequest::Ptr m_async_infer_request_next_;
 	InferRequest infer_request_;
+
 	std::string input_name_;
 	std::string output_name_;
 	Blob::Ptr img_blob_, output_blob_;
-	cv::Mat img_prepro_;
-	void Preprocessing(const cv::Mat& kInputImg, cv::Mat& output_img, int resize_width=256); //which is not required when embeded in openvinoIE
-	void getOutput(cv::Mat&);
-	void PostProcessing(const cv::Mat& kInputImg, cv::Mat& mask);
+
+	void getOutput(cv::Mat&, InferRequest& inferRequest); // rewrite this for your own network
+	InferenceEngine::Blob::Ptr wrapMat2Blob(const cv::Mat& mat);
+
 };
 
 #endif //__VINOIE_H_

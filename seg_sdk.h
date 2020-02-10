@@ -12,15 +12,15 @@
 class SegSdk
 {
 public:
-	SegSdk(std::string device="CPU", std::string cpu_threads="1");
+	SegSdk(int model_index = 1, bool force_cpu_mode = false, std::string cpu_threads = "1"); // 0:compact 1: modest, 2: heavy
 	~SegSdk();
-	void segImg(const cv::Mat& inputImg, cv::Mat& segResult, const bool staticFlag=false); // 
+	bool segImg(cv::Mat& inputImg, cv::Mat& segResult, std::string cvt_color="RGB"); // 
 
 private:
-	const std::string kModelName = "D:\\samba\\seg_demo_openvino19\\model_IR\\256_256\\fp32\\mobilenet_3.5B_with_mean-scale";
-	VideoSmooth video_smoother_;
+	VideoPost post_processor_;
 	ROIGenerator roi_generator_;
 	VINOInference ie_;
-	cv::Mat img_buffer_, img_buffer_roi_;
+	bool compact_mode_ = false;
+	cv::Size seg_shape_ = cv::Size(480, 360); // segmentation input resolution: 360p
 };
 #endif

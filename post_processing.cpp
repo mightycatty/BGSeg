@@ -2,147 +2,162 @@
 //#include <opencv2/core/eigen.hpp>
 #include "post_processing.h"
 #include "utils.h"
+typedef std::chrono::duration<double, std::ratio<1, 1000>> ms;
 
 
 using namespace std;
 //using namespace Eigen;
 
 
-void SizeNorm(cv::Mat& matItem, int maxDim)
-{
-	auto height = matItem.size().height;
-	auto width = matItem.size().width;
-	int shortDim = (int)round(maxDim / 256. * 144.);
-	cv::Size reSize = (height > width) ? cv::Size(shortDim, 320) : cv::Size(320, shortDim);
-	resize(matItem, matItem, reSize);
-}
-
-void ContourRefine(cv::Mat& matItem)
+std::vector<float> VideoPost::ContourRefine(cv::Mat& matItem)
 {
 	// refine mask by eliminating small patch of foreground
-	std::vector<std::vector<cv::Point> > contours;
-	findContours(matItem.clone(), contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
-	std::sort(contours.begin(), contours.end(), ContoursSortFun);
-	cv::Mat matItem_cnt = cv::Mat::zeros(matItem.size(), CV_8U);
-	drawContours(matItem_cnt, contours, 0, cv::Scalar(1), -1);
-	cv::bitwise_and(matItem, matItem_cnt, matItem);
+	static std::vector<std::vector<cv::Point> > contours;
+	std::vector<cv::Point> largest_cnt;
+	static cv::Rect rect_current;
+	static cv::Mat mat_binary;
+	cv::threshold(matItem, mat_binary, 0.5, 1, cv::THRESH_BINARY);
+	mat_binary.convertTo(mat_binary, CV_8UC1);
+	findContours(mat_binary, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+	if (contours.size() >= 1)
+	{
+		std::sort(contours.begin(), contours.end(), ContoursSortFun);
+		cv::Mat matItem_cnt = cv::Mat::zeros(matItem.size(), CV_8UC1);
+		drawContours(matItem_cnt, contours, 0, cv::Scalar(1.), -1);
+		matItem_cnt.convertTo(matItem_cnt, CV_32FC1);
+		cv::multiply(matItem, matItem_cnt, matItem);
+		largest_cnt = contours[0];
+
+		rect_current = cv::boundingRect(largest_cnt);
+		relative_rect_[0] = rect_current.x / float(matItem.size().width);
+		relative_rect_[2] = rect_current.width / float(matItem.size().width);
+		relative_rect_[1] = rect_current.y / float(matItem.size().height);
+		relative_rect_[3] = rect_current.height / float(matItem.size().height);
+	}
+	else
+	{
+		relative_rect_ = {0., 0., 0., 0.};
+	}
+
+	return relative_rect_;
 }
 
-void EdgeSmooth(cv::Mat& binary_mask, const int kIteration)
-{
-	cv::GaussianBlur(binary_mask, binary_mask, cv::Size(3, 3), 0);
-}
 
-VideoSmooth::VideoSmooth()
+VideoPost::VideoPost()
 {
 	//
 }
 
 
-VideoSmooth::~VideoSmooth()
+VideoPost::~VideoPost()
 {
 	// 
 }
 
 
-void VideoSmooth::Reset()
+void VideoPost::Reset()
 {
 	prev_mask_.release();
-	img_seq_sum_.release();
-	mask_seq_sum_.release();
-	img_seq_buffer_.clear();
-	mask_seq_buffer_.clear();
+	fusion_mask_.release();
+	prev_img_.release();
 }
 
 
-void VideoSmooth::MaskSmooth(cv::Mat& prev_mask, cv::Mat& current_mask, cv::Mat& result)
+void VideoPost::MaskSmooth(cv::Mat& current_mask, cv::Mat& result)
 {
-	result = float(1 - kSmoothDegree_) * prev_mask + float(kSmoothDegree_) * current_mask;
-}
-
-
-void VideoSmooth::SeqMaskFusion(cv::Mat& new_img, cv::Mat& new_mask, cv::Mat& fusion_result)
-{
-	int height = new_img.size().height;
-	int width = new_img.size().width;
-	// img & mask proprocessing
-	cv::pyrDown(new_img, new_img);
-	new_img.convertTo(new_img, CV_32FC3);
-	img_seq_buffer_.push_back(new_img.clone()); // matÇ³¿½±´£¬ÐèÒªclone
-	mask_seq_buffer_.push_back(new_mask.clone());
-	// sum up mask
-	if (mask_seq_sum_.empty()) mask_seq_sum_ = cv::Mat::zeros(cv::Size(width, height), CV_8UC1);
-	mask_seq_sum_ += new_mask;
-	if (img_seq_sum_.empty()) img_seq_sum_ = cv::Mat::zeros(cv::Size(width / 2, height / 2), CV_32FC3);
-	img_seq_sum_ += new_img;
-	if (int(img_seq_buffer_.size()) == kSmoothLen_)
+	static cv::Mat a, b;
+	static float smooth_degree = 0.80;
+	if (!(prev_mask_.empty()))
 	{
-		// ===============get the intersection and union of seq masks=====================
-		cv::threshold(mask_seq_sum_, mask_inter_, double(kSmoothLen_-1), 1, cv::THRESH_BINARY);
-		cv::threshold(mask_seq_sum_, mask_un_, 0, 1, cv::THRESH_BINARY);
-		// ================ std for img seq ===================
-		cv::Mat img_mean = img_seq_sum_ / float(kSmoothLen_);
-		cv::Mat img_square_sum = cv::Mat::zeros(cv::Size(width / 2, height / 2), CV_32FC3);
-		for (int i=0; i < kSmoothLen_ ; ++i)
+		if (!fusion_mask_.empty())
 		{
-			auto img_item = img_seq_buffer_[i].clone();
-			img_item -= img_mean;
-			cv::multiply(img_item, img_item, img_item);
-			img_square_sum += img_item;
-		}
-		cv::Mat img_std = img_square_sum / float(kSmoothLen_ - 1);
-		cv::sqrt(img_std, img_std);
-		// =================== get fusion mask out of img std(img dynamic) ================================
-		cv::Mat fusion_mask;
-		cv::transform(img_std, fusion_mask, cv::Matx13f(1, 1, 1));
-		double min, max;
-		cv::minMaxLoc(fusion_mask, &min, &max);
-		int max_threshold = 50; //**TODO**: hardcode threhold, might lead to performance hit under different environment
-		if (max < max_threshold)
-		{
-			mask_inter_.copyTo(fusion_result);
+			fusion_mask_ = fusion_mask_ * smooth_degree + (1. - fusion_mask_) * (1 - smooth_degree);
+			cv::multiply((1. - fusion_mask_), prev_mask_, a);
+			cv::multiply(fusion_mask_, current_mask, b);
+			cv::add(a, b, result);
 		}
 		else
 		{
-			fusion_mask /= max;
-			fusion_mask *= 255.;
-			fusion_mask.convertTo(fusion_mask, CV_8UC1);
-			/*cv::namedWindow("img_std");
-			cv::imshow("img_std", fusion_mask);*/
-			cv::threshold(fusion_mask, fusion_mask, 0, 1, cv::THRESH_BINARY+cv::THRESH_OTSU);
-			dilate(fusion_mask, fusion_mask, cv::Mat(), cv::Point(-1, -1), 3); // 3times
-			pyrUp(fusion_mask, fusion_mask);
-			/*cv::namedWindow("img_std_binary");
-			cv::imshow("img_std_binary", fusion_mask * 255);*/
-			//fusion_result = fusion_mask * new_mask + (1 - fusion_mask) * mask_inter_;
-			cv::copyTo(new_mask, fusion_result, fusion_mask); // directly copy pixel value with mask, which yields identic result as above
-			cv::copyTo(mask_inter_, fusion_result, 1 - fusion_mask);
+			//result = float(1 - kSmoothDegree_) * prev_mask + float(kSmoothDegree_) * current_mask;
+			cv::addWeighted(current_mask, (smooth_degree), prev_mask_, (1- smooth_degree), 0., result);
 		}
-		// ===========================fusion===============================
-		// erase the oldest img/mask pair
-		mask_seq_sum_ -= mask_seq_buffer_[0];
-		img_seq_sum_ -= img_seq_buffer_[0];
-		img_seq_buffer_.erase(img_seq_buffer_.begin());
-		mask_seq_buffer_.erase(mask_seq_buffer_.begin());
-	}
-}
-
-
-void VideoSmooth::Process(cv::Mat& new_img, cv::Mat& new_mask, cv::Mat& result)
-{
-	// memory binding
-	SeqMaskFusion(new_img, new_mask, result);
-	//cv::imshow("fusion", result * 255);
-	result.convertTo(result, CV_32FC1); // convertion to fp32 for alpha-smooth later
-	if (!(prev_mask_.empty()))
-	{
-		MaskSmooth(prev_mask_, result, result);
-		EdgeSmooth(result, 1);
-		result.copyTo(prev_mask_);
 	}
 	else
 	{
-		EdgeSmooth(new_mask, 1);
-		new_mask.copyTo(prev_mask_);
+		result = current_mask;
+	}
+	result.copyTo(prev_mask_);
+}
+
+
+
+
+void VideoPost::GetMotionMask(const cv::Mat& new_img)
+{
+	static cv::Mat img_diff;
+	static cv::Mat img_gray;
+	static float acc_factor = 0.8;
+	static double min, max;
+	cv::cvtColor(new_img, img_gray, cv::COLOR_BGR2GRAY);
+	if (not prev_img_.empty())
+	{
+		cv::absdiff(prev_img_, img_gray, img_diff);
+		//img_diff.convertTo(img_diff, CV_8UC1);
+		//cv::multiply(img_diff, new_mask, img_diff);
+		cv::minMaxLoc(img_diff, &min, &max);
+		cv::threshold(img_diff, fusion_mask_, 0.2*max, 1, cv::THRESH_BINARY);
+		int erosion_size = 5;
+		cv::Mat kernel = getStructuringElement(cv::MORPH_RECT,
+			cv::Size(2 * erosion_size + 1, 2 * erosion_size + 1),
+			cv::Point(erosion_size, erosion_size));
+		cv::dilate(fusion_mask_, fusion_mask_, kernel);
+		fusion_mask_.convertTo(fusion_mask_, CV_32FC1);
+		//cv::imshow("fusion_mask", fusion_mask_*255);
+
+		prev_img_ = acc_factor *  prev_img_ + (1 - acc_factor) * img_gray;
+		//cv::imshow("avg_img", prev_img_);
+		//cv::waitKey(1);
+	}
+	else
+	{
+		img_gray.copyTo(prev_img_);
 	}
 }
+
+
+void VideoPost::Process(cv::Mat& new_img, cv::Mat& new_mask, cv::Mat& result, bool compact_mode)
+{
+	static cv::Mat new_img_down;
+	static double duration_ms;
+	duration_ms = std::chrono::duration_cast<ms>(std::chrono::high_resolution_clock::now() - last_time_stamp_).count();
+	last_time_stamp_ = std::chrono::high_resolution_clock::now();
+	if (duration_ms > reset_time_gap_) { Reset(); }  // if time gap between two frame is larger than threshold ,reset postprocessor
+	if (!compact_mode)
+	{
+		cv::resize(new_img, new_img_down, cv::Size(post_processing_size_, post_processing_size_), cv::INTER_NEAREST);
+		GetMotionMask(new_img_down);
+		if (!fusion_mask_.empty())
+		{
+			cv::resize(fusion_mask_, fusion_mask_, new_img.size());
+		}
+		MaskSmooth(result, result);
+		ContourRefine(result);
+		// edge refine
+		for (int i = 0; i < 2; i++)
+		{
+			cv::medianBlur(result, result, 5);
+		}
+		int erode_size = 1;
+		static cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT,
+			cv::Size(2 * erode_size + 1, 2 * erode_size + 1),
+			cv::Point(erode_size, erode_size));
+		/// Apply the dilation operation
+		cv::erode(result, result, element);
+	}
+	else
+	{
+		new_mask.copyTo(result);
+		ContourRefine(result);
+	}
+}
+
