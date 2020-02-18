@@ -1,0 +1,21 @@
+﻿################################################################################
+# 此 .gitignore 文件已由 Microsoft(R) Visual Studio 自动创建。
+################################################################################
+
+*.sln
+/.idea
+/.SynologyWorkingDirectory
+/.vs
+/libs
+/logs
+/model_IR
+/samples
+/x64
+
+/seg_demo_openvino19.vcxproj.user
+/seg_demo_openvino19.vcxproj.filters
+/seg_demo_openvino19.vcxproj
+*.dll
+/x64/Release
+/.vs/seg_demo_openvino19/v15
+/.vs
