@@ -49,3 +49,5 @@ segSdk.segImg(input_img, seg_result, cvt_format)
 
 ---
 
+# others:
+    master分支并非最新分支，最新分支请查看hs_dev分支
