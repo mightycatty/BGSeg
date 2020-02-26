@@ -3,3 +3,19 @@
 ################################################################################
 
 *.sln
+/.idea
+/.SynologyWorkingDirectory
+/.vs
+/libs
+/logs
+/model_IR
+/samples
+/x64
+
+/seg_demo_openvino19.vcxproj.user
+/seg_demo_openvino19.vcxproj.filters
+/seg_demo_openvino19.vcxproj
+*.dll
+/x64/Release
+/.vs/seg_demo_openvino19/v15
+/.vs
