@@ -7,7 +7,6 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 
-// TODO：增加基于指数平滑的平滑策略
 class ROIGenerator
 {
 public:

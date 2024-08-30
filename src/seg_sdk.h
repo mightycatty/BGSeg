@@ -8,7 +8,7 @@
 #include "ie_backend.h"
 # include "utils.h"
 
-// setBlob错误有release下缺少plugins.xml文件引起(vs重新生成会清理掉)
+
 class SegSdk
 {
 public:
